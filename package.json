@@ -9,7 +9,7 @@
     "node": ">=24.11.0"
   },
   "scripts": {
-    "dev": "pnpm --parallel --filter ./apps/* dev",
+    "dev": "pnpm -r --parallel dev",
     "build": "pnpm -r build",
     "lint": "eslint .",
     "typecheck": "pnpm -r typecheck",
