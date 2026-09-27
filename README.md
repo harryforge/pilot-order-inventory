@@ -13,7 +13,7 @@ for integration tests and demos (framework design D-09).
 |---|---|---|
 | R01 | Skeleton: pnpm workspace, Vue web app, NestJS api, PostgreSQL, sample tests | Done |
 | R02 | Features F1–F6: products, inventory, customers, orders, order list, sample data | Done |
-| R03 | CI, security scans, branch protection, CODEOWNERS, PR template | CI, CODEOWNERS, PR template done; branch protection waits for framework QUESTIONS #123, #124 |
+| R03 | CI, security scans, branch protection, CODEOWNERS, PR template | Done |
 | R04 | Specs T01–T10 in `docs/specs/`, `AGENTS.md` | Planned |
 
 ## Stack
@@ -108,10 +108,13 @@ a SHA-256.
 - `ci-ok` is the single check that branch protection requires. Thresholds are in the workflow's
   `env:` block only. Accepted exceptions go in `.gitleaks.toml` or `.trivyignore`, each with a reason.
 - Integration tests are never retried: a failure is investigated, not hidden.
-- Protection planned for `main` (not active yet: the repo is private on GitHub Free, framework
-  QUESTIONS #123): pull request required, `ci-ok` from GitHub Actions required and up to date,
-  approval per QUESTIONS #124, stale approvals dismissed, conversations resolved, no force pushes,
-  no deletions, and no bypass for anyone, including admins and the platform's GitHub App.
+- `main` is protected (the repo is public for this, framework QUESTIONS #123): nobody pushes to it
+  directly, not even admins or the platform's GitHub App. A pull request is required, with `ci-ok`
+  from GitHub Actions passed on a branch that is up to date with `main`. Stale approvals are dismissed,
+  conversations must be resolved, force pushes and deletion are refused, and there is no bypass.
+- Approvals: 0 required until Person B has an account (framework QUESTIONS #124). Then: 1 approval,
+  code owner reviews, and approval of the last push.
+- This repo is public: never put client data or credentials in code, pull requests, issues or CI logs.
 - Every pull request uses the template: task, `intent_id` and `run_id` (`none` when a person opened
   it), spec, AI disclosure. Only the reviewer ticks the human-review box.
 

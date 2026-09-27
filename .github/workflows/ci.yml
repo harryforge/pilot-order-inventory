@@ -1,8 +1,8 @@
 # CI for the sample pilot repo (framework task R03, design D-09 §6). Adapted from the framework's
 # .github/workflows/ci.yml: same pinned actions and tools, same thresholds.
 #
-# `ci-ok` is the single required check for `main` (branch protection, D-09 §6). Branch
-# protection needs a public repo or GitHub Team (framework QUESTIONS #123).
+# `ci-ok` is the single required check for `main` (branch protection, D-09 §6; framework
+# QUESTIONS #123). Renaming the job breaks the required check: change the protection too.
 name: ci
 
 on:
