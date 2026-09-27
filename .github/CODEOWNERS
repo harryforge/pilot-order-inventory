@@ -1,6 +1,6 @@
 # Code owners (framework task R03, design D-09 §6). Harry is the only named owner today.
-# Add Person B when the account exists (framework QUESTIONS #124). On the GitHub Free plan
-# GitHub ignores this file for private repositories (framework QUESTIONS #123).
+# Add Person B when the account exists; then branch protection requires code owner reviews
+# (framework QUESTIONS #124).
 # Later rules win over earlier ones.
 
 *             @hoanghainh1188
