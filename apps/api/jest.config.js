@@ -14,6 +14,6 @@ export default {
   transform: {
     '^.+\\.ts$': ['ts-jest', { tsconfig: '<rootDir>/../tsconfig.json', useESM: true }],
   },
-  collectCoverageFrom: ['**/*.ts', '!main.ts', '!data-source.ts', '!migrations/**'],
+  collectCoverageFrom: ['**/*.ts', '!main.ts', '!data-source.ts', '!migrations/**', '!testing/**'],
   coverageDirectory: '../coverage',
 };

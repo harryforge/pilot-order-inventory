@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { onMounted, ref } from 'vue';
-import { fetchHealth, type HealthStatus } from '../api/health';
+import { fetchHealth, type HealthStatus } from './api';
 
 const health = ref<HealthStatus | null>(null);
 const error = ref<string | null>(null);
