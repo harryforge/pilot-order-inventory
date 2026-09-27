@@ -15,7 +15,8 @@
     "typecheck": "pnpm -r typecheck",
     "test": "pnpm -r test",
     "test:integration": "pnpm --filter @pilot/api test:integration",
-    "db:migrate": "pnpm --filter @pilot/api migration:run"
+    "db:migrate": "pnpm --filter @pilot/api migration:run",
+    "db:seed": "pnpm --filter @pilot/api seed"
   },
   "devDependencies": {
     "@eslint/js": "10.0.1",

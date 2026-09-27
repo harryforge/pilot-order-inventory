@@ -4,6 +4,9 @@ import CustomerFormView from './features/customers/CustomerFormView.vue';
 import CustomerListView from './features/customers/CustomerListView.vue';
 import InventoryDetailView from './features/inventory/InventoryDetailView.vue';
 import InventoryListView from './features/inventory/InventoryListView.vue';
+import OrderDetailView from './features/orders/OrderDetailView.vue';
+import OrderFormView from './features/orders/OrderFormView.vue';
+import OrderListView from './features/orders/OrderListView.vue';
 import ProductDetailView from './features/products/ProductDetailView.vue';
 import ProductFormView from './features/products/ProductFormView.vue';
 import ProductListView from './features/products/ProductListView.vue';
@@ -14,7 +17,10 @@ function numberParam(name: string, prop = name) {
 }
 
 export const routes: RouteRecordRaw[] = [
-  { path: '/', redirect: '/products' },
+  { path: '/', redirect: '/orders' },
+  { path: '/orders', component: OrderListView },
+  { path: '/orders/new', component: OrderFormView },
+  { path: '/orders/:id(\\d+)', component: OrderDetailView, props: numberParam('id') },
   { path: '/products', component: ProductListView },
   { path: '/products/new', component: ProductFormView },
   { path: '/products/:id(\\d+)', component: ProductDetailView, props: numberParam('id') },

@@ -12,7 +12,7 @@ for integration tests and demos (framework design D-09).
 | Task | Scope | Status |
 |---|---|---|
 | R01 | Skeleton: pnpm workspace, Vue web app, NestJS api, PostgreSQL, sample tests | Done |
-| R02 | Features F1–F6: products, inventory, customers, orders, order list, sample data | In progress: F1–F3 done (PR A); F4–F6 next (PR B) |
+| R02 | Features F1–F6: products, inventory, customers, orders, order list, sample data | Done |
 | R03 | CI, security scans, branch protection, CODEOWNERS, PR template | Planned |
 | R04 | Specs T01–T10 in `docs/specs/`, `AGENTS.md` | Planned |
 
@@ -51,12 +51,13 @@ corepack enable pnpm
 pnpm install --frozen-lockfile
 docker compose up -d
 pnpm db:migrate
+pnpm db:seed
 pnpm dev
 ```
 
 Then open:
 
-- Web app: <http://localhost:5173>. The footer shows the api and database status.
+- Web app: <http://localhost:5173>. It opens the order list. The footer shows the api and database status.
 - Api health check: <http://localhost:3000/api/health>. It returns `{"status":"ok","database":"up"}`,
   or HTTP 503 with `"database":"down"` when PostgreSQL is not reachable.
 
@@ -82,6 +83,8 @@ Run these in the repo root.
 | `pnpm test:integration` | Api integration tests against PostgreSQL (needs `docker compose up -d`) |
 | `pnpm build` | Production build of both apps (`apps/*/dist`) |
 | `pnpm db:migrate` | Builds the api and applies pending TypeORM migrations |
+| `pnpm db:seed` | Loads the fictional sample data (F6). Refuses to run if the database has data |
+| `pnpm db:seed --reset` | Deletes **all** data, then loads the sample data again |
 
 ## Features
 
@@ -93,6 +96,9 @@ The baseline features follow D-09 §4. Screen labels are English; the order stat
 | F1 | Products: create, edit, view, list | `/products`, `/products/new`, `/products/:id`, `/products/:id/edit` | `GET/POST /products`, `GET/PATCH /products/:id` |
 | F2 | Inventory: goods in, goods out, stock, movement history (single warehouse) | `/inventory`, `/inventory/:productId` | `GET /inventory`, `GET /inventory/:productId`, `GET /inventory/:productId/movements`, `POST /inventory/goods-in`, `POST /inventory/goods-out` |
 | F3 | Customers: create, view, list | `/customers`, `/customers/new`, `/customers/:id` | `GET/POST /customers`, `GET /customers/:id` |
+| F4 | Orders: create multi-line orders that check and deduct stock; status 受付 → 出荷済 | `/orders/new`, `/orders/:id` | `POST /orders`, `GET /orders/:id`, `POST /orders/:id/ship` |
+| F5 | Order list: search by order number and/or customer name, no pagination | `/orders?orderNumber=&customer=` | `GET /orders?orderNumber=&customer=` |
+| F6 | Sample data: 50 products, 20 customers, 100 orders (60 shipped) | — | `pnpm db:seed` |
 
 Business rules:
 
@@ -102,7 +108,25 @@ Business rules:
 - Stock never goes below zero. Every change writes a stock movement (`in` or `out`, a reason, the
   quantity and the balance after it). Goods out that would go below zero is refused with HTTP 409.
 - Stock changes lock the stock rows in product id order (`SELECT … FOR UPDATE`), so concurrent
-  requests wait for each other instead of overselling.
+  requests wait for each other instead of overselling, and orders that list the same products in
+  a different order cannot deadlock.
+- Creating an order runs in **one transaction**: check the customer and the products (they must
+  exist and be `on_sale`), save the order and its lines, then lock, check and deduct the stock of
+  every line. If any line is short, the whole order is refused with HTTP 409 `INSUFFICIENT_STOCK`,
+  `details` lists every short product, and nothing is saved. Lines for the same product are merged.
+- A line keeps the unit price of the moment the order was created. The order total is the sum of
+  the lines, in whole yen, without tax.
+- Order numbers are `SO-` plus six digits from a PostgreSQL sequence. A refused order still uses
+  up its number (sequences are not rolled back), so the numbers can have gaps.
+- Status: a new order is 受付. `POST /orders/:id/ship` moves it to 出荷済 and sets `shippedAt`;
+  any other change returns HTTP 409 `INVALID_STATUS_TRANSITION`. Shipping does not change the stock:
+  it was taken when the order was created. The statuses and their allowed changes are defined in
+  `apps/api/src/orders/order-status.ts`.
+- The order list search matches part of the order number and part of the customer name, ignoring
+  case. Both filters are separate query parameters and the web app keeps them in the page URL.
+- The sample data is made up and deterministic (fixed random seed): generic shop names, addresses in
+  the non-existent サンプル市, and phone numbers with the unused exchange `0000`. The seed goes
+  through the normal services, so every order checks and deducts stock like a real one.
 
 Errors use the NestJS body (`statusCode`, `message`) plus a stable `code`, for example
 `{"statusCode":409,"code":"INSUFFICIENT_STOCK","message":"Not enough stock","details":[{"productId":3,"requested":9,"available":2}]}`.
@@ -149,6 +173,13 @@ database. `pnpm test:integration` uses a separate database, `<POSTGRES_DB>_test`
 with `_test`), on the Docker Compose PostgreSQL. Each test file drops the schema and runs every
 migration, so the migrations are tested too. These tests run one file at a time (`--runInBand`).
 `pnpm test` stays database-free.
+
+The order stock deduction (R02 AC2) is covered by `apps/api/src/orders/orders.int-spec.ts` and
+`order-rollback.int-spec.ts`: enough stock, exact stock, insufficient stock on one of several lines,
+the same product on several lines, concurrent orders on the last units, concurrent orders that list
+products in opposite order, and a failure after the deduction (the order and the deduction are both
+rolled back). The failure is injected by replacing `InventoryService` through the NestJS testing
+module.
 
 ### Installs use the npm registry only
 

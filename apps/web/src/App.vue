@@ -3,6 +3,7 @@ import { useRoute } from 'vue-router';
 import HealthStatus from './features/health/HealthStatus.vue';
 
 const navigation = [
+  { to: '/orders', label: 'Orders' },
   { to: '/products', label: 'Products' },
   { to: '/inventory', label: 'Inventory' },
   { to: '/customers', label: 'Customers' },
