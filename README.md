@@ -13,7 +13,7 @@ for integration tests and demos (framework design D-09).
 |---|---|---|
 | R01 | Skeleton: pnpm workspace, Vue web app, NestJS api, PostgreSQL, sample tests | Done |
 | R02 | Features F1–F6: products, inventory, customers, orders, order list, sample data | Done |
-| R03 | CI, security scans, branch protection, CODEOWNERS, PR template | Planned |
+| R03 | CI, security scans, branch protection, CODEOWNERS, PR template | CI, CODEOWNERS, PR template done; branch protection waits for framework QUESTIONS #123, #124 |
 | R04 | Specs T01–T10 in `docs/specs/`, `AGENTS.md` | Planned |
 
 ## Stack
@@ -38,6 +38,10 @@ pilot-order-inventory/
 │   └── api/            # NestJS api (port 3000, all routes under /api)
 ├── docs/
 │   └── specs/          # Bilingual Japanese–English specs, one file per feature (R04)
+├── .github/
+│   ├── workflows/ci.yml          # CI and security scans
+│   ├── CODEOWNERS
+│   └── pull_request_template.md  # Template T2: links, AI disclosure, verification
 ├── docker-compose.yml  # PostgreSQL for local development
 └── README.md
 ```
@@ -85,6 +89,31 @@ Run these in the repo root.
 | `pnpm db:migrate` | Builds the api and applies pending TypeORM migrations |
 | `pnpm db:seed` | Loads the fictional sample data (F6). Refuses to run if the database has data |
 | `pnpm db:seed --reset` | Deletes **all** data, then loads the sample data again |
+
+## CI and repo protection
+
+GitHub Actions runs `.github/workflows/ci.yml` on every pull request, on every push to `main`,
+and nightly (new CVEs). All actions are pinned by commit SHA; downloaded tools are checked against
+a SHA-256.
+
+| Job | What it checks | Blocks on |
+|---|---|---|
+| `lint, type check, test, build` | `pnpm lint`, `typecheck`, `test`, `build` (web and api), actionlint | Any failure |
+| `integration (PostgreSQL)` | `pnpm test:integration` against a PostgreSQL service container, same image and digest as `docker-compose.yml` | Any failure, or a different image in the two files |
+| `secrets (gitleaks)` | The full git history | Any finding |
+| `code (semgrep)` | Rulesets `p/default`, `p/github-actions` | Severity `ERROR` |
+| `dependencies (trivy)` | `pnpm-lock.yaml` (dev dependencies included) and configuration files | `CRITICAL` (`HIGH` is listed in the job summary) |
+| `ci-ok` | Every job above passed | Any other result |
+
+- `ci-ok` is the single check that branch protection requires. Thresholds are in the workflow's
+  `env:` block only. Accepted exceptions go in `.gitleaks.toml` or `.trivyignore`, each with a reason.
+- Integration tests are never retried: a failure is investigated, not hidden.
+- Protection planned for `main` (not active yet: the repo is private on GitHub Free, framework
+  QUESTIONS #123): pull request required, `ci-ok` from GitHub Actions required and up to date,
+  approval per QUESTIONS #124, stale approvals dismissed, conversations resolved, no force pushes,
+  no deletions, and no bypass for anyone, including admins and the platform's GitHub App.
+- Every pull request uses the template: task, `intent_id` and `run_id` (`none` when a person opened
+  it), spec, AI disclosure. Only the reviewer ticks the human-review box.
 
 ## Features
 

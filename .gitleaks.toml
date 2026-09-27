@@ -1,0 +1,5 @@
+# Gitleaks configuration (framework task R03). The default rules, nothing removed.
+# An accepted exception goes in an [allowlist] below, with a comment giving the reason.
+# The fake local database password in docker-compose.yml and .env.example is not a secret.
+[extend]
+useDefault = true

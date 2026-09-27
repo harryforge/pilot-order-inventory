@@ -1,0 +1,215 @@
+# CI for the sample pilot repo (framework task R03, design D-09 §6). Adapted from the framework's
+# .github/workflows/ci.yml: same pinned actions and tools, same thresholds.
+#
+# `ci-ok` is the single required check for `main` (branch protection, D-09 §6). Branch
+# protection needs a public repo or GitHub Team (framework QUESTIONS #123).
+name: ci
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  schedule:
+    - cron: '0 18 * * *' # nightly, 03:00 JST: new CVEs
+  workflow_dispatch:
+
+# Every job only reads the repository. Do not widen this without review.
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+env:
+  # Blocking thresholds. Change them here only.
+  # Accepted exceptions go in .gitleaks.toml or .trivyignore, with a reason.
+  TRIVY_BLOCK_SEVERITY: CRITICAL
+  TRIVY_REPORT_SEVERITY: HIGH # listed in the job summary, does not block
+  SEMGREP_BLOCK_SEVERITY: ERROR
+  SEMGREP_RULESETS: p/default p/github-actions
+  # Pinned tools: version and SHA-256 of the linux x64 release archive.
+  GITLEAKS_VERSION: 8.30.1
+  GITLEAKS_SHA256: 551f6fc83ea457d62a0d98237cbad105af8d557003051f41f3e7ca7b3f2470eb
+  TRIVY_VERSION: 0.74.0
+  TRIVY_SHA256: 2ae6fe3ee734b7fdf11335663e18c75ea12dccc76062f09f164a3b0f8be4371a
+  ACTIONLINT_VERSION: 1.7.12
+  ACTIONLINT_SHA256: 8aca8db96f1b94770f1b0d72b6dddcb1ebb8123cb3712530b08cc387b349a3d8
+  SEMGREP_IMAGE: semgrep/semgrep:1.178.0@sha256:32e459968daabe7ab86968184a29109b9564aa00392401156f9788452b42786b
+
+jobs:
+  checks:
+    name: lint, type check, test, build
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0 (reads packageManager)
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm lint
+      - run: pnpm typecheck
+      - run: pnpm test
+      - run: pnpm build # web and api
+      - name: Lint workflows (actionlint)
+        run: |
+          archive="actionlint_${ACTIONLINT_VERSION}_linux_amd64.tar.gz"
+          curl -fsSLo "$RUNNER_TEMP/$archive" \
+            "https://github.com/rhysd/actionlint/releases/download/v${ACTIONLINT_VERSION}/$archive"
+          echo "$ACTIONLINT_SHA256  $RUNNER_TEMP/$archive" | sha256sum -c -
+          tar -xzf "$RUNNER_TEMP/$archive" -C "$RUNNER_TEMP" actionlint
+          "$RUNNER_TEMP/actionlint" -color
+
+  integration:
+    name: integration (PostgreSQL)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    services:
+      postgres:
+        # Same image and digest as docker-compose.yml (checked by the first step).
+        image: postgres:18.6-alpine3.24@sha256:77f585114c32fbca283dc835b0596f4e52b51b4c6662d7810b2f4084f60a1873
+        # Fake, local-only values from .env.example. No GitHub secrets.
+        env:
+          POSTGRES_DB: pilot
+          POSTGRES_USER: pilot
+          POSTGRES_PASSWORD: pilot-local-only
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U pilot -d pilot"
+          --health-interval 2s
+          --health-timeout 3s
+          --health-retries 30
+    env:
+      POSTGRES_HOST: localhost
+      POSTGRES_PORT: '5432'
+      POSTGRES_DB: pilot
+      POSTGRES_USER: pilot
+      POSTGRES_PASSWORD: pilot-local-only
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: The PostgreSQL image matches docker-compose.yml
+        run: |
+          compose=$(grep -Eo 'postgres:[^[:space:]]+@sha256:[0-9a-f]{64}' docker-compose.yml)
+          ci=$(grep -Eo 'postgres:[^[:space:]]+@sha256:[0-9a-f]{64}' .github/workflows/ci.yml)
+          echo "docker-compose.yml: $compose"
+          echo "ci.yml:             $ci"
+          if [ -z "$compose" ] || [ "$compose" != "$ci" ]; then
+            echo "::error::the PostgreSQL image in ci.yml and docker-compose.yml must be the same (tag and digest)"
+            exit 1
+          fi
+      - uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0 (reads packageManager)
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      # No retries: a failure here is a real failure (R02 flaky-test watch).
+      - run: pnpm test:integration
+
+  gitleaks:
+    name: secrets (gitleaks)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0 # scan the full history
+          persist-credentials: false
+      - name: Install gitleaks
+        run: |
+          archive="gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz"
+          curl -fsSLo "$RUNNER_TEMP/$archive" \
+            "https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/$archive"
+          echo "$GITLEAKS_SHA256  $RUNNER_TEMP/$archive" | sha256sum -c -
+          tar -xzf "$RUNNER_TEMP/$archive" -C "$RUNNER_TEMP" gitleaks
+      - name: Scan (any finding blocks)
+        run: |
+          status=0
+          # --log-opts HEAD: the full history of the checked-out commit only. The default (--all)
+          # would also scan other branches fetched by fetch-depth 0, such as other open PRs.
+          "$RUNNER_TEMP/gitleaks" git --config .gitleaks.toml --log-opts HEAD --redact --verbose --exit-code 1 \
+            --report-format json --report-path "$RUNNER_TEMP/gitleaks.json" . || status=$?
+          count=$(jq length "$RUNNER_TEMP/gitleaks.json" 2>/dev/null || echo "unknown")
+          echo "### gitleaks: $count finding(s) (values redacted)" >> "$GITHUB_STEP_SUMMARY"
+          exit "$status"
+
+  semgrep:
+    name: code (semgrep)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Scan (severity ERROR blocks)
+        run: |
+          configs=""
+          for ruleset in $SEMGREP_RULESETS; do configs="$configs --config $ruleset"; done
+          status=0
+          # shellcheck disable=SC2086 # $configs is a list of flags
+          docker run --rm -v "$PWD:/src" -w /src "$SEMGREP_IMAGE" \
+            semgrep scan $configs --severity "$SEMGREP_BLOCK_SEVERITY" --error \
+            --metrics off --disable-version-check --json-output semgrep.json || status=$?
+          count=$(jq '.results | length' semgrep.json 2>/dev/null || echo "unknown")
+          echo "### semgrep: $count finding(s) at severity $SEMGREP_BLOCK_SEVERITY" >> "$GITHUB_STEP_SUMMARY"
+          exit "$status"
+
+  trivy:
+    name: dependencies (trivy)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Install trivy
+        run: |
+          archive="trivy_${TRIVY_VERSION}_Linux-64bit.tar.gz"
+          curl -fsSLo "$RUNNER_TEMP/$archive" \
+            "https://github.com/aquasecurity/trivy/releases/download/v${TRIVY_VERSION}/$archive"
+          echo "$TRIVY_SHA256  $RUNNER_TEMP/$archive" | sha256sum -c -
+          tar -xzf "$RUNNER_TEMP/$archive" -C "$RUNNER_TEMP" trivy
+      - name: Report (does not block)
+        run: |
+          "$RUNNER_TEMP/trivy" fs --scanners vuln,misconfig --include-dev-deps \
+            --severity "$TRIVY_REPORT_SEVERITY,$TRIVY_BLOCK_SEVERITY" --ignorefile .trivyignore \
+            --disable-telemetry --skip-version-check --exit-code 0 \
+            --format table --output "$RUNNER_TEMP/trivy.txt" .
+          {
+            echo "### trivy: $TRIVY_REPORT_SEVERITY and $TRIVY_BLOCK_SEVERITY findings (only $TRIVY_BLOCK_SEVERITY blocks)"
+            echo '```text'
+            cat "$RUNNER_TEMP/trivy.txt"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+      - name: Scan (severity CRITICAL blocks)
+        run: |
+          "$RUNNER_TEMP/trivy" fs --scanners vuln,misconfig --include-dev-deps \
+            --severity "$TRIVY_BLOCK_SEVERITY" --ignorefile .trivyignore \
+            --disable-telemetry --skip-version-check --exit-code 1 .
+
+  ci-ok:
+    name: ci-ok
+    needs: [checks, integration, gitleaks, semgrep, trivy]
+    if: always()
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - name: All jobs passed or were skipped
+        env:
+          RESULTS: ${{ join(needs.*.result, ' ') }}
+        run: |
+          echo "Job results: $RESULTS"
+          for result in $RESULTS; do
+            case "$result" in
+              success | skipped) ;;
+              *) echo "::error::a CI job ended with '$result'"; exit 1 ;;
+            esac
+          done
