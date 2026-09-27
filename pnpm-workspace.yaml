@@ -1,0 +1,13 @@
+packages:
+  - apps/*
+
+# pnpm 10 does not run dependency install scripts unless they are listed in
+# onlyBuiltDependencies. The list is empty on purpose: an install must only fetch packages
+# from the npm registry (the agent sandbox reaches a package proxy and nothing else).
+# The packages below ship prebuilt binaries as optional dependencies; their install scripts
+# are fallbacks or notices that we do not need. Listing them keeps the install output quiet.
+onlyBuiltDependencies: []
+ignoredBuiltDependencies:
+  - '@nestjs/core'
+  - '@parcel/watcher'
+  - unrs-resolver
