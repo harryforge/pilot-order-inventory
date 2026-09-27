@@ -14,7 +14,7 @@ for integration tests and demos (framework design D-09).
 | R01 | Skeleton: pnpm workspace, Vue web app, NestJS api, PostgreSQL, sample tests | Done |
 | R02 | Features F1–F6: products, inventory, customers, orders, order list, sample data | Done |
 | R03 | CI, security scans, branch protection, CODEOWNERS, PR template | Done |
-| R04 | Specs T01–T10 in `docs/specs/`, `AGENTS.md` | Planned |
+| R04 | Specs T01–T10 in `docs/specs/`, `AGENTS.md` | Done |
 
 ## Stack
 
@@ -37,11 +37,12 @@ pilot-order-inventory/
 │   ├── web/            # Vue 3 app (Vite dev server on port 5173, proxies /api to the api)
 │   └── api/            # NestJS api (port 3000, all routes under /api)
 ├── docs/
-│   └── specs/          # Bilingual Japanese–English specs, one file per feature (R04)
+│   └── specs/          # Bilingual Japanese–English specs for the agent tasks T01–T10
 ├── .github/
 │   ├── workflows/ci.yml          # CI and security scans
 │   ├── CODEOWNERS
 │   └── pull_request_template.md  # Template T2: links, AI disclosure, verification
+├── AGENTS.md           # Instructions for AI coding agents (loaded by OpenHands)
 ├── docker-compose.yml  # PostgreSQL for local development
 └── README.md
 ```
@@ -117,6 +118,16 @@ a SHA-256.
 - This repo is public: never put client data or credentials in code, pull requests, issues or CI logs.
 - Every pull request uses the template: task, `intent_id` and `run_id` (`none` when a person opened
   it), spec, AI disclosure. Only the reviewer ticks the human-review box.
+
+## Agent tasks and AGENTS.md
+
+- `docs/specs/` holds one bilingual spec per agent task T01–T10 (framework design D-09 §7).
+  The platform, not the agent, decides each task's risk tier and autonomy level.
+- `AGENTS.md` is the only agent instruction file. OpenHands loads it from the workspace.
+  The platform's agent register pins its SHA-256 (framework ADR-M31 §2.5): after every edit,
+  register a new agent version, or runs are refused with `instructions_mismatch`.
+- Do not add other instruction files (`CLAUDE.md`, `AGENTS.md` in a subfolder, `.openhands/`,
+  `.agents/`, `.cursorrules`): OpenHands would load them too, but the register does not pin them (framework QUESTIONS #126).
 
 ## Features
 
