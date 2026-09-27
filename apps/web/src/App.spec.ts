@@ -23,9 +23,9 @@ describe('App', () => {
     expect(wrapper.text()).toContain('受注・在庫管理');
   });
 
-  it('opens the product list from the home page', async () => {
+  it('opens the order list from the home page', async () => {
     const router = createAppRouter(createMemoryHistory());
     await router.push('/');
-    expect(router.currentRoute.value.fullPath).toBe('/products');
+    expect(router.currentRoute.value.fullPath).toBe('/orders');
   });
 });

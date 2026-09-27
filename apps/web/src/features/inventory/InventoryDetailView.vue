@@ -174,7 +174,15 @@ async function submit(): Promise<void> {
               :key="movement.id"
             >
               <td>{{ formatDateTime(movement.createdAt) }}</td>
-              <td>{{ MOVEMENT_REASON_LABELS[movement.reason] }}</td>
+              <td>
+                {{ MOVEMENT_REASON_LABELS[movement.reason] }}
+                <RouterLink
+                  v-if="movement.orderId !== null"
+                  :to="`/orders/${movement.orderId}`"
+                >
+                  #{{ movement.orderId }}
+                </RouterLink>
+              </td>
               <td
                 class="numeric"
                 :class="movement.type === 'in' ? 'is-in' : 'is-out'"

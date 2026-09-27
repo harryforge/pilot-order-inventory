@@ -1,5 +1,5 @@
 import type { INestApplication } from '@nestjs/common';
-import { Test } from '@nestjs/testing';
+import { Test, type TestingModuleBuilder } from '@nestjs/testing';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { DataSource } from 'typeorm';
 import type { PostgresDataSourceOptions } from 'typeorm/driver/postgres/PostgresDataSourceOptions.js';
@@ -45,20 +45,25 @@ export interface TestApp {
   dataSource: DataSource;
 }
 
-/** Starts the api with every feature module on a freshly migrated test database. */
-export async function createTestApp(): Promise<TestApp> {
+/**
+ * Starts the api with every feature module on a freshly migrated test database.
+ * `customize` can replace providers, for example to inject a failure.
+ */
+export async function createTestApp(
+  customize: (builder: TestingModuleBuilder) => TestingModuleBuilder = (builder) => builder,
+): Promise<TestApp> {
   const options = testDatabaseOptions();
   await ensureDatabaseExists(options);
-  const moduleRef = await Test.createTestingModule({
-    imports: [TypeOrmModule.forRoot(options), ...FEATURE_MODULES],
-  }).compile();
+  const moduleRef = await customize(
+    Test.createTestingModule({
+      imports: [TypeOrmModule.forRoot(options), ...FEATURE_MODULES],
+    }),
+  ).compile();
   const app = configureApp(moduleRef.createNestApplication());
-  await app.init();
+  // Listen on a free port once. Otherwise supertest starts and stops the server around every
+  // batch of requests, which makes the parallel-request tests timing-dependent.
+  await app.listen(0, '127.0.0.1');
   return { app, dataSource: app.get(DataSource) };
 }
 
-/** Empties every table and restarts the ids, keeping the migration history. */
-export async function truncateAll(dataSource: DataSource): Promise<void> {
-  const tables = dataSource.entityMetadatas.map((meta) => `"${meta.tableName}"`).join(', ');
-  await dataSource.query(`TRUNCATE ${tables} RESTART IDENTITY CASCADE`);
-}
+export { truncateAll } from '../database/truncate.js';

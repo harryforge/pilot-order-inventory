@@ -269,6 +269,101 @@ h3 {
   color: var(--color-ink-muted);
 }
 
+/* Order status: 受付 is open work (accent), 出荷済 is done (muted) */
+.status {
+  display: inline-block;
+  padding: 0 var(--space-2);
+  border-radius: var(--radius-sm);
+  font-size: var(--text-sm);
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  vertical-align: middle;
+}
+
+.status--received {
+  background: var(--color-accent);
+  color: var(--color-accent-ink);
+}
+
+.status--shipped {
+  border: 1px solid var(--color-rule-strong);
+  color: var(--color-ink-muted);
+}
+
+.mono-heading {
+  font-family: var(--font-mono);
+  margin-right: var(--space-3);
+}
+
+.data-table tfoot th {
+  border-bottom: 0;
+}
+
+.data-table tfoot td.total {
+  font-size: var(--text-lg);
+  font-weight: 700;
+  border-bottom: 0;
+}
+
+/* Order form */
+.form.form--wide {
+  max-width: 56rem;
+}
+
+.order-lines {
+  display: grid;
+  gap: var(--space-3);
+  margin: 0;
+  padding: var(--space-4);
+  border: 0;
+  background: var(--color-surface);
+  box-shadow: var(--shadow-raised);
+}
+
+.order-lines > .button {
+  justify-self: start;
+}
+
+.order-lines legend {
+  float: left;
+  font-weight: 700;
+}
+
+.order-line {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: var(--space-3);
+  padding-bottom: var(--space-3);
+  border-bottom: 1px solid var(--color-rule);
+}
+
+.order-line > label:not(.grow) {
+  flex: 0 1 7rem;
+}
+
+.order-line .grow {
+  flex: 1 1 16rem;
+}
+
+.line-amount {
+  min-width: 6rem;
+  padding-bottom: var(--space-2);
+}
+
+.line-error {
+  flex-basis: 100%;
+  margin: 0;
+  color: var(--color-negative);
+  font-weight: 600;
+}
+
+.order-total {
+  margin: 0;
+  font-size: var(--text-lg);
+  text-align: right;
+}
+
 /* Detail lists */
 .detail-list {
   display: grid;

@@ -11,7 +11,8 @@
     "test": "node --experimental-vm-modules --no-warnings=ExperimentalWarning node_modules/jest/bin/jest.js",
     "test:integration": "node --env-file-if-exists=../../.env --experimental-vm-modules --no-warnings=ExperimentalWarning node_modules/jest/bin/jest.js -c jest.integration.config.js --runInBand",
     "migration:run": "pnpm build && node --env-file-if-exists=../../.env node_modules/typeorm/cli.js migration:run -d dist/data-source.js",
-    "migration:revert": "pnpm build && node --env-file-if-exists=../../.env node_modules/typeorm/cli.js migration:revert -d dist/data-source.js"
+    "migration:revert": "pnpm build && node --env-file-if-exists=../../.env node_modules/typeorm/cli.js migration:revert -d dist/data-source.js",
+    "seed": "pnpm build && node --env-file-if-exists=../../.env dist/seed/seed.js"
   },
   "dependencies": {
     "@nestjs/common": "12.1.0",

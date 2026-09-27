@@ -6,6 +6,11 @@ export const ERROR_CODES = {
   skuAlreadyExists: 'SKU_ALREADY_EXISTS',
   insufficientStock: 'INSUFFICIENT_STOCK',
   customerNotFound: 'CUSTOMER_NOT_FOUND',
+  orderNotFound: 'ORDER_NOT_FOUND',
+  productNotOnSale: 'PRODUCT_NOT_ON_SALE',
+  orderTotalTooLarge: 'ORDER_TOTAL_TOO_LARGE',
+  invalidOrderLines: 'INVALID_ORDER_LINES',
+  invalidStatusTransition: 'INVALID_STATUS_TRANSITION',
 } as const;
 
 export type ErrorCode = (typeof ERROR_CODES)[keyof typeof ERROR_CODES];
@@ -42,4 +47,8 @@ export function customerNotFound(customerId: number): DomainError {
     ERROR_CODES.customerNotFound,
     `Customer ${customerId} not found`,
   );
+}
+
+export function orderNotFound(orderId: number): DomainError {
+  return new DomainError(HttpStatus.NOT_FOUND, ERROR_CODES.orderNotFound, `Order ${orderId} not found`);
 }
