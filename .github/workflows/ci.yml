@@ -145,6 +145,11 @@ jobs:
     name: code (semgrep)
     runs-on: ubuntu-24.04
     timeout-minutes: 15
+    # Uploads the findings to GitHub code scanning; the SDLC platform reads their counts per
+    # severity at gate G6 (framework QUESTIONS #157). Never more than this job needs.
+    permissions:
+      contents: read
+      security-events: write
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -161,11 +166,30 @@ jobs:
           count=$(jq '.results | length' semgrep.json 2>/dev/null || echo "unknown")
           echo "### semgrep: $count finding(s) at severity $SEMGREP_BLOCK_SEVERITY" >> "$GITHUB_STEP_SUMMARY"
           exit "$status"
+      - name: Report all severities as SARIF (does not block)
+        if: always()
+        run: |
+          configs=""
+          for ruleset in $SEMGREP_RULESETS; do configs="$configs --config $ruleset"; done
+          # shellcheck disable=SC2086 # $configs is a list of flags
+          docker run --rm -v "$PWD:/src" -w /src "$SEMGREP_IMAGE" \
+            semgrep scan $configs --metrics off --disable-version-check \
+            --sarif-output semgrep.sarif || true
+      - name: Upload to code scanning
+        if: always() && hashFiles('semgrep.sarif') != ''
+        uses: github/codeql-action/upload-sarif@2892aa5e19bbd11bc0cff5427e3b750a04d9e3c2 # v4.38.2
+        with:
+          sarif_file: semgrep.sarif
+          category: semgrep
 
   trivy:
     name: dependencies (trivy)
     runs-on: ubuntu-24.04
     timeout-minutes: 15
+    # Uploads the findings to GitHub code scanning (framework QUESTIONS #157).
+    permissions:
+      contents: read
+      security-events: write
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -189,6 +213,17 @@ jobs:
             cat "$RUNNER_TEMP/trivy.txt"
             echo '```'
           } >> "$GITHUB_STEP_SUMMARY"
+      - name: Report all severities as SARIF (does not block)
+        run: |
+          "$RUNNER_TEMP/trivy" fs --scanners vuln,misconfig --include-dev-deps \
+            --ignorefile .trivyignore --disable-telemetry --skip-version-check --exit-code 0 \
+            --format sarif --output trivy.sarif .
+      - name: Upload to code scanning
+        if: always() && hashFiles('trivy.sarif') != ''
+        uses: github/codeql-action/upload-sarif@2892aa5e19bbd11bc0cff5427e3b750a04d9e3c2 # v4.38.2
+        with:
+          sarif_file: trivy.sarif
+          category: trivy
       - name: Scan (severity CRITICAL blocks)
         run: |
           "$RUNNER_TEMP/trivy" fs --scanners vuln,misconfig --include-dev-deps \
