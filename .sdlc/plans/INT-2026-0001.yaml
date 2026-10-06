@@ -1,0 +1,11 @@
+# Plan file for the SDLC platform's live test (template T13, schema version 1). Fixed, fictional text.
+# The test's first intent is always INT-<UTC year>-0001, so each new year needs a new file.
+# The agent appends one fixed, fictional line to docs/live-test/RUNS.md. The plan allows that
+# folder only, so a live run never changes the application code under apps/.
+plan:
+  intent_id: INT-2026-0001
+tasks:
+  - id: T1
+    summary: 'Live test of the SDLC platform (fictional). [stub:live]'
+    allowed_paths: [docs/live-test/**]
+    tools: [file_editor, terminal]
